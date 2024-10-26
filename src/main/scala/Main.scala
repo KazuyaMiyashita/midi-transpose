@@ -2,10 +2,12 @@ import java.io.File
 import java.nio.file.Files
 import javax.sound.midi.MidiSystem
 import javax.sound.midi.Sequence
-import javax.swing.*
-import java.awt.*
-import java.awt.event.*
-import scala.jdk.CollectionConverters.*
+import java.awt._
+import java.awt.event._
+import java.awt.datatransfer.DataFlavor
+import javax.swing._
+import javax.swing.TransferHandler.TransferSupport
+import scala.jdk.CollectionConverters._
 
 object Main {
 
@@ -36,7 +38,6 @@ object Main {
         val message = midiEvent.getMessage
         message match {
           case m: javax.sound.midi.ShortMessage =>
-            // println(f"short: ${m.getChannel}, ${m.getCommand}%2X, ${m.getData1}%2X, ${m.getData2}%2X")
             val channel = m.getChannel
             val command = m.getCommand
             if (channel != 9 && (command == 0x80 || command == 0x90)) {
@@ -50,7 +51,6 @@ object Main {
   }
 
   def main(args: Array[String]): Unit = {
-
     // ファイルの状態を保持する変数
     var selectedFile: Option[File] = None
 
@@ -63,6 +63,35 @@ object Main {
     // ファイル選択ボタンとファイル表示ラベル
     val fileChooserButton = new JButton("Select MIDI File")
     val fileLabel = new JLabel("No file selected")
+
+    // ドロップエリアを作成
+    val dropPanel = new JPanel {
+      setPreferredSize(new Dimension(400, 100))
+      setBorder(BorderFactory.createTitledBorder("Drag and drop your MIDI file here"))
+
+      // ドラッグアンドドロップの設定
+      setTransferHandler(new TransferHandler {
+        override def canImport(support: TransferSupport): Boolean = {
+          support.isDataFlavorSupported(DataFlavor.javaFileListFlavor)
+        }
+
+        override def importData(support: TransferSupport): Boolean = {
+          if (canImport(support)) {
+            val files = support.getTransferable
+              .getTransferData(DataFlavor.javaFileListFlavor)
+              .asInstanceOf[java.util.List[File]]
+              .asScala
+            files.headOption.foreach { file =>
+              selectedFile = Some(file)
+              fileLabel.setText(s"Selected: ${file.getName}")
+            }
+            true
+          } else {
+            false
+          }
+        }
+      })
+    }
 
     // -6 から 6 までの移調ボタンパネル（0は除外）
     val buttonPanel = new JPanel()
@@ -109,7 +138,8 @@ object Main {
     topPanel.add(fileLabel, BorderLayout.CENTER)
 
     frame.add(topPanel, BorderLayout.NORTH)
-    frame.add(buttonPanel, BorderLayout.CENTER)
+    frame.add(dropPanel, BorderLayout.CENTER) // ドロップパネルを追加
+    frame.add(buttonPanel, BorderLayout.SOUTH)
 
     // アプリの初期ファイル設定
     if (args.nonEmpty) {
@@ -118,7 +148,5 @@ object Main {
     }
 
     frame.setVisible(true)
-
   }
-
 }
